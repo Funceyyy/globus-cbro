@@ -1,0 +1,284 @@
+local library = loadstring(game:HttpGet("https://raw.githubusercontent.com/bloodball/-back-ups-for-libs/main/Kronos"))()
+
+local window = library:Window({
+    Title = "globus - right skift to hide menu",
+    Accent = Color3.fromRGB(69, 69, 207),
+    Logo = 3610245066,
+    ToggleKey = Enum.KeyCode.RightShift -- Changed from LeftAlt to RightShift
+})
+
+local tab = window:NewTab({ Logo = 4483345998 })
+local tabsection = tab:TabSection({ Title = "Cheats" })
+local column = tabsection:AddColumn({ Title = "Aimbot" })
+local section = column:Section({ Title = "Aimbot" })
+
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local Player = game.Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
+local Mouse = Player:GetMouse()
+
+
+local esp_enabled = false
+local fov_enabled = false
+local highlight_enabled = false
+local aimbot_enabled = false
+local wall_check_enabled = false  -- New toggle for wall check
+local aim_part = "Head"
+local esp_table = {}
+local highlight_table = {}
+local teleport_enabled = false
+
+
+local esp_color_enemy = Color3.fromRGB(255, 0, 0)
+local esp_color_team = Color3.fromRGB(0, 255, 0)  -- Color for teammates
+local esp_thickness = 2
+local esp_transparency = 0.75
+
+-- FOV Circle
+local fov_circle = Drawing.new("Circle")
+fov_circle.Radius = 100
+fov_circle.Color = Color3.fromRGB(255, 255, 255)
+fov_circle.Thickness = 2
+fov_circle.Filled = false
+fov_circle.Visible = false
+
+local function updateFOVPosition()
+    fov_circle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+end
+RunService.RenderStepped:Connect(updateFOVPosition)
+
+section:Toggle({
+    Text = "Enable Aimbot",
+    State = false,
+    Callback = function(state)
+        aimbot_enabled = state
+    end
+})
+
+section:Toggle({
+    Text = "Show FOV",
+    State = false,
+    Callback = function(state)
+        fov_enabled = state
+        fov_circle.Visible = fov_enabled
+    end
+})
+
+section:Slider({
+    Text = "FOV",
+    Min = 0,
+    Max = 500,
+    Def = 100,
+    Callback = function(value)
+        fov_circle.Radius = value
+    end
+})
+
+local smoothing = 50  -- Default smoothing value
+section:Slider({
+    Text = "Aimbot speed",
+    Min = 1,
+    Max = 100,
+    Def = smoothing,
+    Callback = function(value)
+        smoothing = value
+    end
+})
+
+section:Slider({
+    Text = "Aimbot Target Part",
+    Min = 1,
+    Max = 3,
+    Def = 1,
+    Callback = function(value)
+        if value == 1 then
+            aim_part = "Head"
+        elseif value == 2 then
+            aim_part = "UpperTorso"
+        elseif value == 3 then
+            aim_part = "HumanoidRootPart"
+        end
+    end
+})
+
+-- New toggle for Wall Check
+section:Toggle({
+    Text = "Enable Wall Check (Aimbot)",
+    State = false,
+    Callback = function(state)
+        wall_check_enabled = state
+    end
+})
+
+
+
+local function isEnemy(player)
+    return player.Team ~= LocalPlayer.Team
+end
+
+local function removeESP(character)
+    if highlight_table[character] then
+        highlight_table[character]:Destroy()
+        highlight_table[character] = nil
+    end
+end
+
+local function highlightPlayer(character, isEnemy)
+    if not highlight_enabled then return end
+    if highlight_table[character] then return end
+
+    local highlight = Instance.new("Highlight")
+    highlight.Parent = character
+    highlight.FillColor = isEnemy and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(0, 255, 0)
+    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.FillTransparency = 0.5
+    highlight.OutlineTransparency = 0
+
+    highlight_table[character] = highlight
+end
+
+Players.PlayerRemoving:Connect(function(player)
+    if player.Character then
+        removeESP(player.Character)
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    for _, player in pairs(Players:GetPlayers()) do
+        local character = player.Character
+        local isEnemyFlag = isEnemy(player)  -- Determine if player is enemy
+
+        if character and character:FindFirstChild("HumanoidRootPart") and character:FindFirstChild("Humanoid").Health > 0 then
+            highlightPlayer(character, isEnemyFlag)
+        else
+            removeESP(character)
+        end
+    end
+end)
+
+-- Get Closest Enemy in FOV
+local function getClosestEnemy()
+    local closestEnemy = nil
+    local shortestDistance = fov_circle.Radius
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and isEnemy(player) then
+            local character = player.Character
+            if character and character:FindFirstChild("HumanoidRootPart") and character:FindFirstChild("Humanoid").Health > 0 then
+                local hrp = character:FindFirstChild("HumanoidRootPart")
+                local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+
+                if onScreen then
+                    local distance = (Vector2.new(pos.X, pos.Y) - fov_circle.Position).Magnitude
+                    if distance < shortestDistance then
+                        closestEnemy = character
+                        shortestDistance = distance
+                    end
+                end
+            end
+        end
+    end
+
+    return closestEnemy
+end
+
+-- Wall check: Check if there is an obstacle between the camera and the target
+local function isTargetVisible(target)
+    local ray = Ray.new(Camera.CFrame.Position, (target.Position - Camera.CFrame.Position).unit * (Camera.CFrame.Position - target.Position).Magnitude)
+    local hitPart, hitPosition = workspace:FindPartOnRay(ray, LocalPlayer.Character, false, true)
+    
+    if hitPart and hitPart.Parent and hitPart.Parent:FindFirstChild("Humanoid") then
+        -- It's the target we're aiming for
+        return true
+    end
+    
+    -- If something else is hit, return false
+    return hitPart == nil
+end
+
+-- Aimbot Logic with wall check
+local aimbot_target = nil
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        aimbot_enabled = true
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input, gameProcessed)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        aimbot_enabled = false
+        aimbot_target = nil
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if aimbot_enabled then
+        aimbot_target = getClosestEnemy()
+    end
+
+    if aimbot_target then
+        local aimPartPosition = aimbot_target:FindFirstChild(aim_part) and aimbot_target[aim_part].Position
+        if aimPartPosition then
+            -- Wall check: Only aim if no obstacles are in the way
+            if wall_check_enabled and isTargetVisible(aimPartPosition) or not wall_check_enabled then
+                -- Smoothly adjust the camera towards the target
+                Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, aimPartPosition), smoothing / 100)
+            end
+        end
+    end
+end)
+
+
+
+local column = tabsection:AddColumn({ Title = "visuals" })
+local section = column:Section({ Title = "visuals" })
+
+section:Toggle({
+    Text = "Chams",
+    State = false,
+    Callback = function(state)
+        highlight_enabled = state
+        if not state then
+            for _, highlight in pairs(highlight_table) do
+                if highlight then
+                    highlight:Destroy()
+                end
+            end
+            highlight_table = {}
+        end
+    end
+})
+
+section:Toggle({
+    Text = "Enable Ctrl+Click Teleport",
+    State = false,
+    Callback = function(state)
+        teleport_enabled = state
+    end
+})
+
+
+
+function GetCharacter()
+    return game.Players.LocalPlayer.Character
+end
+
+function Teleport(pos)
+    local Char = GetCharacter()
+    if Char then
+        Char:MoveTo(pos)
+    end
+end
+
+UIS.InputBegan:Connect(function(input)
+    if teleport_enabled and input.UserInputType == Enum.UserInputType.MouseButton1 and UIS:IsKeyDown(Enum.KeyCode.LeftControl) then
+        Teleport(Mouse.Hit.p)
+    end
+end)
