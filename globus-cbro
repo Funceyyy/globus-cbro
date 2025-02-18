@@ -280,3 +280,118 @@ UIS.InputBegan:Connect(function(input)
         Teleport(Mouse.Hit.p)
     end
 end)
+
+
+
+--  box esp code ---
+
+-- section:Toggle({
+    -- Text = "Enable ESP",
+    -- State = false,
+    -- Callback = function(state)
+       -- esp_enabled = state
+      --  if not state then
+        --    for _, box in pairs(esp_table) do
+         --       if box.updateBox then
+           --         box.updateBox = nil
+          --      end
+           --     if box.cleanupBox then
+           --         box.cleanupBox()
+           --     end
+         --   end
+       --     esp_table = {}
+       -- end
+   -- end
+--})
+
+
+
+local function isEnemy(player)
+    local localPlayer = game.Players.LocalPlayer
+    if player.Team and localPlayer.Team then
+        return player.Team ~= localPlayer.Team
+    else
+        return true
+    end
+end
+
+
+local function createESPBox(character, isEnemy)
+    local box = Drawing.new("Square")
+    local healthBar = Drawing.new("Line")
+    local distanceLabel = Drawing.new("Text")
+    local nameLabel = Drawing.new("Text")
+
+    box.Visible = false
+    box.Color = isEnemy and esp_color_enemy or esp_color_teammate
+    box.Thickness = esp_thickness
+    box.Transparency = esp_transparency
+
+    healthBar.Visible = false
+    healthBar.Color = Color3.fromRGB(0, 255, 0)
+    healthBar.Thickness = 3
+
+    distanceLabel.Visible = false
+    distanceLabel.Color = Color3.fromRGB(255, 255, 255)
+    distanceLabel.Size = 14
+    distanceLabel.Center = true
+    distanceLabel.Outline = true
+    distanceLabel.Font = Drawing.Fonts.UI
+
+    nameLabel.Visible = false
+    nameLabel.Color = Color3.fromRGB(255, 255, 255)
+    nameLabel.Size = 14
+    nameLabel.Center = true
+    nameLabel.Outline = true
+    nameLabel.Font = Drawing.Fonts.UI
+
+    local function updateBox()
+        if character and character:FindFirstChild("HumanoidRootPart") and character:FindFirstChild("Humanoid").Health > 0 then
+            local hrp = character:FindFirstChild("HumanoidRootPart")
+            local humanoid = character:FindFirstChild("Humanoid")
+            local playerName = game.Players:GetPlayerFromCharacter(character).Name
+            local pos, onScreen = workspace.CurrentCamera:WorldToViewportPoint(hrp.Position)
+
+            if onScreen and esp_enabled then
+                local distance = (workspace.CurrentCamera.CFrame.Position - hrp.Position).Magnitude
+                local size = Vector3.new(2, 3, 0) * (workspace.CurrentCamera.ViewportSize.Y / distance)
+                box.Size = size
+                box.Position = Vector2.new(pos.X - size.X / 2, pos.Y - size.Y / 2)
+                box.Visible = true
+
+                local healthPercentage = humanoid and (humanoid.Health / humanoid.MaxHealth) or 0
+                healthBar.From = Vector2.new(box.Position.X - 6, box.Position.Y + box.Size.Y)
+                healthBar.To = Vector2.new(healthBar.From.X, healthBar.From.Y - (box.Size.Y * healthPercentage))
+                healthBar.Visible = true
+
+                distanceLabel.Position = Vector2.new(pos.X, pos.Y + box.Size.Y / 2 + 10)
+                distanceLabel.Text = string.format("%d Studs", math.floor(distance))
+                distanceLabel.Visible = true
+
+                nameLabel.Position = Vector2.new(pos.X, pos.Y - box.Size.Y / 2 - 10)
+                nameLabel.Text = playerName
+                nameLabel.Visible = true
+            else
+                box.Visible = false
+                healthBar.Visible = false
+                distanceLabel.Visible = false
+                nameLabel.Visible = false
+            end
+        else
+            box.Visible = false
+            healthBar.Visible = false
+            distanceLabel.Visible = false
+            nameLabel.Visible = false
+        end
+    end
+
+    local function cleanupBox()
+        box:Remove()
+        healthBar:Remove()
+        distanceLabel:Remove()
+        nameLabel:Remove()
+        esp_table[character] = nil
+    end
+
+    return updateBox, cleanupBox
+end
