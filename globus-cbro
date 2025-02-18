@@ -27,7 +27,7 @@ local esp_enabled = false
 local fov_enabled = false
 local highlight_enabled = false
 local aimbot_enabled = false
-local wall_check_enabled = false  -- New toggle for wall check
+local wall_check_enabled = false
 local aim_part = "Head"
 local esp_table = {}
 local highlight_table = {}
@@ -35,7 +35,7 @@ local teleport_enabled = false
 
 
 local esp_color_enemy = Color3.fromRGB(255, 0, 0)
-local esp_color_team = Color3.fromRGB(0, 255, 0)  -- Color for teammates
+local esp_color_team = Color3.fromRGB(0, 255, 0)
 local esp_thickness = 2
 local esp_transparency = 0.75
 
@@ -79,7 +79,7 @@ section:Slider({
     end
 })
 
-local smoothing = 50  -- Default smoothing value
+local smoothing = 50
 section:Slider({
     Text = "Aimbot speed",
     Min = 1,
@@ -106,7 +106,6 @@ section:Slider({
     end
 })
 
--- New toggle for Wall Check
 section:Toggle({
     Text = "Enable Wall Check (Aimbot)",
     State = false,
@@ -152,7 +151,7 @@ end)
 RunService.RenderStepped:Connect(function()
     for _, player in pairs(Players:GetPlayers()) do
         local character = player.Character
-        local isEnemyFlag = isEnemy(player)  -- Determine if player is enemy
+        local isEnemyFlag = isEnemy(player)
 
         if character and character:FindFirstChild("HumanoidRootPart") and character:FindFirstChild("Humanoid").Health > 0 then
             highlightPlayer(character, isEnemyFlag)
@@ -188,7 +187,6 @@ local function getClosestEnemy()
     return closestEnemy
 end
 
--- Wall check: Check if there is an obstacle between the camera and the target
 local function isTargetVisible(target)
     local ray = Ray.new(Camera.CFrame.Position, (target.Position - Camera.CFrame.Position).unit * (Camera.CFrame.Position - target.Position).Magnitude)
     local hitPart, hitPosition = workspace:FindPartOnRay(ray, LocalPlayer.Character, false, true)
